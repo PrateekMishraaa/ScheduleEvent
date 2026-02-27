@@ -1,29 +1,39 @@
+// 📁 src/pages/Dashboard.jsx (UPDATED WITH SCHOOL NAME & CLASS)
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 
 const Dashboard = () => {
-  const { user, logout, updateProfile } = useAuth();
+  const { user, logout, updateProfile, getMyMessages, getMyStats, axiosInstance } = useAuth();
   const [messages, setMessages] = useState([]);
   const [stats, setStats] = useState(null);
   const [loadingMessages, setLoadingMessages] = useState(true);
+  const [loadingStats, setLoadingStats] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [profileData, setProfileData] = useState({
     fullName: user?.fullName || '',
     city: user?.city || '',
+    schoolName: user?.schoolName || '',     // ✅ NEW
+    className: user?.className || '',        // ✅ NEW
     whatsappOptIn: user?.whatsappOptIn ?? true
   });
 
   useEffect(() => {
-    fetchMessages();
-    fetchStats();
+    fetchData();
   }, []);
+
+  const fetchData = async () => {
+    try {
+      await Promise.all([fetchMessages(), fetchStats()]);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    }
+  };
 
   const fetchMessages = async () => {
     try {
-      const res = await axios.get('/activity/my-messages');
-      setMessages(res.data.messages);
+      const data = await getMyMessages();
+      setMessages(data.messages || []);
     } catch (error) {
       console.error('Error fetching messages');
     } finally {
@@ -33,10 +43,12 @@ const Dashboard = () => {
 
   const fetchStats = async () => {
     try {
-      const res = await axios.get('/activity/stats');
-      setStats(res.data.stats);
+      const data = await getMyStats();
+      setStats(data.stats);
     } catch (error) {
       console.error('Error fetching stats');
+    } finally {
+      setLoadingStats(false);
     }
   };
 
@@ -47,20 +59,49 @@ const Dashboard = () => {
       toast.success('Profile updated successfully!');
       setEditMode(false);
     } catch (error) {
-      toast.error('Failed to update profile');
+      toast.error(error.response?.data?.message || 'Failed to update profile');
     }
   };
 
   const formatDate = (date) => {
     return new Date(date).toLocaleString('en-IN', {
-      day: 'numeric', month: 'short', year: 'numeric',
-      hour: '2-digit', minute: '2-digit'
+      day: 'numeric', 
+      month: 'short', 
+      year: 'numeric',
+      hour: '2-digit', 
+      minute: '2-digit'
     });
   };
 
   const getInitials = (name) => {
-    return name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    return name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
   };
+
+  // ✅ Class options for edit mode
+  const classOptions = [
+    'Nursery', 'KG', 'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5',
+    'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 'Class 11', 'Class 12',
+    '1st Year College', '2nd Year College', '3rd Year College', '4th Year College',
+    'Postgraduate', 'PhD', 'Diploma', 'Other'
+  ];
+
+  if (!user) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        color: 'white'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div className="spinner-large"></div>
+          <p style={{ marginTop: '20px' }}>Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard">
@@ -78,12 +119,17 @@ const Dashboard = () => {
       </nav>
 
       <div className="dashboard-content">
-        {/* Welcome Banner */}
+        {/* Welcome Banner - UPDATED with School Name */}
         <div className="welcome-banner">
           <div>
             <h2>Namaste, {user?.fullName?.split(' ')[0]}! 🙏</h2>
+            <p style={{ fontSize: '16px', marginBottom: '5px' }}>
+              <span style={{ background: 'rgba(255,255,255,0.2)', padding: '4px 12px', borderRadius: '20px' }}>
+                🏫 {user?.schoolName || 'School not specified'}
+              </span>
+            </p>
             <p>
-              {user?.institutionName} • {user?.classYear} • {user?.city || 'India'}
+              📚 {user?.className || 'Class not specified'} • {user?.city || 'India'}
             </p>
             <p style={{ marginTop: 8, fontSize: 13, opacity: 0.75 }}>
               📲 WhatsApp updates: {user?.whatsappOptIn ? '✅ Active' : '❌ Paused'}
@@ -93,36 +139,38 @@ const Dashboard = () => {
         </div>
 
         {/* Stats */}
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-icon purple">📅</div>
-            <div className="stat-info">
-              <h3>{stats?.weekly || 0}</h3>
-              <p>Weekly Messages</p>
+        {!loadingStats && stats && (
+          <div className="stats-grid">
+            <div className="stat-card">
+              <div className="stat-icon purple">📅</div>
+              <div className="stat-info">
+                <h3>{stats?.weekly || 0}</h3>
+                <p>Weekly Messages</p>
+              </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon blue">🗓️</div>
+              <div className="stat-info">
+                <h3>{stats?.monthly || 0}</h3>
+                <p>Monthly Messages</p>
+              </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon orange">🎊</div>
+              <div className="stat-info">
+                <h3>{stats?.yearly || 0}</h3>
+                <p>Yearly Messages</p>
+              </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon green">📨</div>
+              <div className="stat-info">
+                <h3>{stats?.total || 0}</h3>
+                <p>Total Received</p>
+              </div>
             </div>
           </div>
-          <div className="stat-card">
-            <div className="stat-icon blue">🗓️</div>
-            <div className="stat-info">
-              <h3>{stats?.monthly || 0}</h3>
-              <p>Monthly Messages</p>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon orange">🎊</div>
-            <div className="stat-info">
-              <h3>{stats?.yearly || 0}</h3>
-              <p>Yearly Messages</p>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon green">📨</div>
-            <div className="stat-info">
-              <h3>{stats?.total || 0}</h3>
-              <p>Total Received</p>
-            </div>
-          </div>
-        </div>
+        )}
 
         {/* Message Schedule Info */}
         <div className="card">
@@ -133,25 +181,22 @@ const Dashboard = () => {
             <div className="schedule-item">
               <div className="schedule-icon">📅</div>
               <h4>Weekly</h4>
-              <p>Every Monday</p>
-              <p>9:00 AM IST</p>
+              <p>Every Monday 9:00 AM</p>
             </div>
             <div className="schedule-item">
               <div className="schedule-icon">🗓️</div>
               <h4>Monthly</h4>
-              <p>1st of every month</p>
-              <p>10:00 AM IST</p>
+              <p>1st of month 10:00 AM</p>
             </div>
             <div className="schedule-item">
               <div className="schedule-icon">🎊</div>
               <h4>Yearly</h4>
-              <p>January 1st</p>
-              <p>12:00 AM IST</p>
+              <p>January 1st 12:00 AM</p>
             </div>
           </div>
         </div>
 
-        {/* Profile Section */}
+        {/* Profile Section - UPDATED with School Name & Class */}
         <div className="card">
           <div className="card-header">
             <h3>👤 My Profile</h3>
@@ -171,8 +216,44 @@ const Dashboard = () => {
                   value={profileData.fullName}
                   onChange={e => setProfileData({ ...profileData, fullName: e.target.value })}
                   type="text"
+                  required
                 />
               </div>
+              
+              {/* ✅ NEW - Edit School Name */}
+              <div className="form-group">
+                <label>School / College Name</label>
+                <input
+                  value={profileData.schoolName}
+                  onChange={e => setProfileData({ ...profileData, schoolName: e.target.value })}
+                  type="text"
+                  placeholder="Your school/college name"
+                  required
+                />
+              </div>
+              
+              {/* ✅ NEW - Edit Class */}
+              <div className="form-group">
+                <label>Class / Year</label>
+                <select
+                  value={profileData.className}
+                  onChange={e => setProfileData({ ...profileData, className: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '2px solid #e2e8f0',
+                    borderRadius: '10px',
+                    fontSize: '14px'
+                  }}
+                  required
+                >
+                  <option value="">Select Class</option>
+                  {classOptions.map(option => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </div>
+              
               <div className="form-group">
                 <label>City</label>
                 <input
@@ -211,25 +292,43 @@ const Dashboard = () => {
                 <label>WhatsApp Number</label>
                 <p>{user?.phone}</p>
               </div>
+              
+              {/* ✅ NEW - School Name Display */}
               <div className="profile-item">
-                <label>Institution</label>
-                <p>{user?.institutionName}</p>
+                <label>🏫 School/College</label>
+                <p style={{ fontWeight: 600, color: '#4a5568' }}>
+                  {user?.schoolName || 'Not specified'}
+                </p>
               </div>
+              
+              {/* ✅ NEW - Class Display */}
               <div className="profile-item">
-                <label>Type</label>
-                <p style={{ textTransform: 'capitalize' }}>{user?.institutionType}</p>
+                <label>📚 Class/Year</label>
+                <p style={{ fontWeight: 600, color: '#4a5568' }}>
+                  {user?.className || 'Not specified'}
+                </p>
               </div>
-              <div className="profile-item">
-                <label>Class / Year</label>
-                <p>{user?.classYear}</p>
-              </div>
+              
               <div className="profile-item">
                 <label>City</label>
                 <p>{user?.city || '—'}</p>
               </div>
               <div className="profile-item">
                 <label>Member Since</label>
-                <p>{user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-IN') : '—'}</p>
+                <p>{user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-IN', {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric'
+                }) : '—'}</p>
+              </div>
+              <div className="profile-item">
+                <label>WhatsApp Status</label>
+                <p style={{ 
+                  color: user?.whatsappOptIn ? '#48bb78' : '#f56565',
+                  fontWeight: 600 
+                }}>
+                  {user?.whatsappOptIn ? '✅ Active' : '❌ Paused'}
+                </p>
               </div>
             </div>
           )}
@@ -252,16 +351,24 @@ const Dashboard = () => {
               color: 'var(--gray)', fontSize: 15
             }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>📭</div>
-              <p>No messages yet. Your first message will arrive next Monday!</p>
+              <p>No messages yet. Messages will start arriving soon!</p>
+              <p style={{ fontSize: 13, marginTop: 10, color: '#667eea' }}>
+                ⏱️ Check back in a few minutes
+              </p>
             </div>
           ) : (
             <div className="message-list">
               {messages.map((msg) => (
                 <div key={msg._id} className="message-item">
                   <span className={`message-badge badge-${msg.type}`}>{msg.type}</span>
-                  <span style={{ fontSize: 14, color: 'var(--dark)', flex: 1 }}>
-                    WhatsApp message sent to {msg.phone}
-                  </span>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 14, color: 'var(--dark)', marginBottom: 4 }}>
+                      {msg.message?.substring(0, 60)}...
+                    </p>
+                    <p style={{ fontSize: 11, color: 'var(--gray)' }}>
+                      To: {msg.phone}
+                    </p>
+                  </div>
                   <span style={{
                     padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600,
                     background: msg.status === 'sent' ? 'rgba(40,167,69,0.12)' : 'rgba(220,53,69,0.12)',
@@ -275,6 +382,43 @@ const Dashboard = () => {
             </div>
           )}
         </div>
+
+        {/* ✅ NEW - Quick Info Card */}
+        <div style={{
+          background: 'linear-gradient(135deg, #667eea10 0%, #764ba210 100%)',
+          borderRadius: '12px',
+          padding: '20px',
+          marginTop: '20px',
+          border: '2px solid #667eea30',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '15px'
+        }}>
+          <div>
+            <span style={{ fontSize: '14px', color: '#4a5568' }}>📊 Your Stats</span>
+            <h3 style={{ marginTop: '5px', color: '#2d3748' }}>
+              {stats?.total || 0} Total Messages
+            </h3>
+            <p style={{ fontSize: '13px', color: '#718096' }}>
+              Last message: {user?.lastMessageSent ? formatDate(user.lastMessageSent) : 'No messages yet'}
+            </p>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ 
+              padding: '8px 16px', 
+              background: user?.whatsappOptIn ? '#48bb78' : '#f56565',
+              color: 'white',
+              borderRadius: '30px',
+              fontSize: '14px',
+              fontWeight: 600
+            }}>
+              {user?.whatsappOptIn ? '📱 WhatsApp Active' : '📱 WhatsApp Paused'}
+            </span>
+          </div>
+        </div>
+
       </div>
     </div>
   );

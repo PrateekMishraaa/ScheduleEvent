@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 
 const AdminDashboard = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, axiosInstance } = useAuth();
   const [stats, setStats] = useState(null);
   const [students, setStudents] = useState([]);
   const [logs, setLogs] = useState([]);
+  const [activities, setActivities] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
   const [customMessage, setCustomMessage] = useState('');
   const [targetType, setTargetType] = useState('all');
@@ -15,6 +15,7 @@ const AdminDashboard = () => {
   const [filterType, setFilterType] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [loadingStudents, setLoadingStudents] = useState(false);
+  const [loadingLogs, setLoadingLogs] = useState(false);
 
   useEffect(() => {
     fetchStats();
@@ -23,11 +24,12 @@ const AdminDashboard = () => {
   useEffect(() => {
     if (activeTab === 'students') fetchStudents();
     if (activeTab === 'logs') fetchLogs();
+    if (activeTab === 'activities') fetchActivities();
   }, [activeTab]);
 
   const fetchStats = async () => {
     try {
-      const res = await axios.get('/admin/stats');
+      const res = await axiosInstance.get('/admin/stats');
       setStats(res.data.stats);
     } catch (error) {
       toast.error('Failed to load stats');
@@ -37,7 +39,7 @@ const AdminDashboard = () => {
   const fetchStudents = async () => {
     setLoadingStudents(true);
     try {
-      const res = await axios.get(`/admin/students?type=${filterType}&limit=50`);
+      const res = await axiosInstance.get(`/admin/students?type=${filterType}&limit=50`);
       setStudents(res.data.students);
     } catch (error) {
       toast.error('Failed to load students');
@@ -47,11 +49,23 @@ const AdminDashboard = () => {
   };
 
   const fetchLogs = async () => {
+    setLoadingLogs(true);
     try {
-      const res = await axios.get('/admin/message-logs?limit=100');
+      const res = await axiosInstance.get('/admin/message-logs?limit=100');
       setLogs(res.data.logs);
     } catch (error) {
       toast.error('Failed to load logs');
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
+  const fetchActivities = async () => {
+    try {
+      const res = await axiosInstance.get('/admin/activities');
+      setActivities(res.data.activities);
+    } catch (error) {
+      toast.error('Failed to load activities');
     }
   };
 
@@ -63,13 +77,15 @@ const AdminDashboard = () => {
     }
     setSending(true);
     try {
-      const res = await axios.post('/admin/send-custom', {
+      const res = await axiosInstance.post('/admin/send-custom', {
         message: customMessage,
+        targetAudience: targetType === 'all' ? 'all' : targetType,
         institutionType: targetType !== 'all' ? targetType : undefined
       });
       toast.success(res.data.message);
       setCustomMessage('');
       fetchStats();
+      fetchLogs();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to send messages');
     } finally {
@@ -79,7 +95,7 @@ const AdminDashboard = () => {
 
   const handleToggleStudent = async (studentId, currentStatus) => {
     try {
-      await axios.put(`/admin/toggle-student/${studentId}`);
+      await axiosInstance.put(`/admin/toggle-student/${studentId}`);
       toast.success(`Student ${currentStatus ? 'deactivated' : 'activated'}`);
       fetchStudents();
       fetchStats();
@@ -90,29 +106,17 @@ const AdminDashboard = () => {
 
   const formatDate = (date) => {
     return new Date(date).toLocaleDateString('en-IN', {
-      day: 'numeric', month: 'short', year: 'numeric'
+      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
     });
   };
 
   const filteredStudents = students.filter(s =>
-    s.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.institutionName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.email.toLowerCase().includes(searchTerm.toLowerCase())
+    s.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    s.institutionName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    s.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const getInitials = (name) => name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-
-  const tabStyle = (tab) => ({
-    padding: '10px 24px',
-    border: 'none',
-    background: activeTab === tab ? 'var(--primary)' : 'var(--light-gray)',
-    color: activeTab === tab ? 'white' : 'var(--dark)',
-    borderRadius: '8px',
-    fontWeight: 600,
-    cursor: 'pointer',
-    fontSize: 14,
-    transition: 'all 0.2s'
-  });
+  const getInitials = (name) => name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'A';
 
   return (
     <div className="dashboard">
@@ -130,7 +134,7 @@ const AdminDashboard = () => {
       </nav>
 
       <div className="dashboard-content">
-        {/* Welcome */}
+        {/* Welcome Banner */}
         <div className="welcome-banner" style={{ background: 'linear-gradient(135deg, #2d3748 0%, #4a5568 100%)' }}>
           <div>
             <h2>Admin Dashboard 🛡️</h2>
@@ -141,7 +145,7 @@ const AdminDashboard = () => {
 
         {/* Stats */}
         {stats && (
-          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+          <div className="stats-grid">
             <div className="stat-card">
               <div className="stat-icon purple">👥</div>
               <div className="stat-info"><h3>{stats.totalStudents}</h3><p>Total Students</p></div>
@@ -160,7 +164,7 @@ const AdminDashboard = () => {
             </div>
             <div className="stat-card">
               <div className="stat-icon purple">📨</div>
-              <div className="stat-info"><h3>{stats.totalMessages}</h3><p>Total Messages Sent</p></div>
+              <div className="stat-info"><h3>{stats.totalMessages}</h3><p>Total Messages</p></div>
             </div>
             <div className="stat-card">
               <div className="stat-icon green">🆕</div>
@@ -171,10 +175,26 @@ const AdminDashboard = () => {
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
-          <button style={tabStyle('overview')} onClick={() => setActiveTab('overview')}>📊 Overview</button>
-          <button style={tabStyle('students')} onClick={() => setActiveTab('students')}>👥 Students</button>
-          <button style={tabStyle('send')} onClick={() => setActiveTab('send')}>📤 Send Message</button>
-          <button style={tabStyle('logs')} onClick={() => setActiveTab('logs')}>📋 Message Logs</button>
+          <button 
+            className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
+            onClick={() => setActiveTab('overview')}
+          >📊 Overview</button>
+          <button 
+            className={`tab-btn ${activeTab === 'students' ? 'active' : ''}`}
+            onClick={() => setActiveTab('students')}
+          >👥 Students</button>
+          <button 
+            className={`tab-btn ${activeTab === 'send' ? 'active' : ''}`}
+            onClick={() => setActiveTab('send')}
+          >📤 Send Message</button>
+          <button 
+            className={`tab-btn ${activeTab === 'logs' ? 'active' : ''}`}
+            onClick={() => setActiveTab('logs')}
+          >📋 Message Logs</button>
+          <button 
+            className={`tab-btn ${activeTab === 'activities' ? 'active' : ''}`}
+            onClick={() => setActiveTab('activities')}
+          >📅 Activities</button>
         </div>
 
         {/* Overview Tab */}
@@ -226,7 +246,7 @@ const AdminDashboard = () => {
                 <select
                   value={filterType}
                   onChange={e => { setFilterType(e.target.value); }}
-                  style={{ padding: '6px 12px', borderRadius: 8, border: '2px solid var(--light-gray)', fontSize: 13 }}
+                  style={{ padding: '6px 12px', borderRadius: 8, border: '2px solid #e2e8f0' }}
                 >
                   <option value="">All Types</option>
                   <option value="school">School</option>
@@ -257,6 +277,7 @@ const AdminDashboard = () => {
                       <th>Type</th>
                       <th>Class/Year</th>
                       <th>WhatsApp</th>
+                      <th>Messages</th>
                       <th>Status</th>
                       <th>Joined</th>
                       <th>Action</th>
@@ -273,12 +294,13 @@ const AdminDashboard = () => {
                         <td><span className={`badge badge-${student.institutionType}`}>{student.institutionType}</span></td>
                         <td>{student.classYear}</td>
                         <td style={{ fontSize: 13 }}>{student.phone}</td>
+                        <td style={{ textAlign: 'center' }}>{student.totalMessages || 0}</td>
                         <td>
                           <span className={`badge ${student.isActive ? 'badge-active' : 'badge-inactive'}`}>
                             {student.isActive ? 'Active' : 'Inactive'}
                           </span>
                         </td>
-                        <td style={{ fontSize: 13 }}>{formatDate(student.createdAt)}</td>
+                        <td style={{ fontSize: 13 }}>{new Date(student.createdAt).toLocaleDateString()}</td>
                         <td>
                           <button
                             className={`btn btn-sm ${student.isActive ? 'btn-danger' : 'btn-success'}`}
@@ -321,6 +343,7 @@ const AdminDashboard = () => {
                   onChange={e => setCustomMessage(e.target.value)}
                   placeholder="Type your WhatsApp message here...&#10;&#10;Use {name} to personalize with student's name.&#10;Example: Hello {name}! Great news about your school..."
                   rows={6}
+                  required
                 />
                 <p style={{ fontSize: 12, color: 'var(--gray)', marginTop: 6 }}>
                   💡 Use <code>{'{name}'}</code> to personalize with each student's name
@@ -353,51 +376,93 @@ const AdminDashboard = () => {
               <h3>📋 Message Delivery Logs</h3>
               <button className="btn btn-secondary btn-sm" onClick={fetchLogs}>🔄 Refresh</button>
             </div>
+            {loadingLogs ? (
+              <div style={{ textAlign: 'center', padding: '30px' }}>Loading...</div>
+            ) : (
+              <div className="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Student</th>
+                      <th>Institution</th>
+                      <th>Type</th>
+                      <th>Phone</th>
+                      <th>Status</th>
+                      <th>Sent At</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {logs.map(log => (
+                      <tr key={log._id}>
+                        <td style={{ fontWeight: 600 }}>{log.userId?.fullName || '—'}</td>
+                        <td style={{ fontSize: 13 }}>{log.userId?.institutionName || '—'}</td>
+                        <td><span className={`message-badge badge-${log.type}`}>{log.type}</span></td>
+                        <td style={{ fontSize: 13 }}>{log.phone}</td>
+                        <td>
+                          <span style={{
+                            padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+                            background: log.status === 'sent' ? 'rgba(40,167,69,0.12)' : 'rgba(220,53,69,0.12)',
+                            color: log.status === 'sent' ? 'var(--success)' : 'var(--danger)'
+                          }}>
+                            {log.status === 'sent' ? '✓ Sent' : '✗ Failed'}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: 12, color: 'var(--gray)' }}>
+                          {formatDate(log.createdAt)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {logs.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '30px', color: 'var(--gray)' }}>
+                    No message logs yet
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Activities Tab */}
+        {activeTab === 'activities' && (
+          <div className="card">
+            <div className="card-header">
+              <h3>📅 Scheduled Activities</h3>
+              <button className="btn btn-secondary btn-sm" onClick={fetchActivities}>🔄 Refresh</button>
+            </div>
             <div className="table-wrapper">
               <table>
                 <thead>
                   <tr>
-                    <th>Student</th>
-                    <th>Institution</th>
+                    <th>Title</th>
                     <th>Type</th>
-                    <th>Phone</th>
                     <th>Status</th>
+                    <th>Recipients</th>
+                    <th>Success/Failed</th>
                     <th>Sent At</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {logs.map(log => (
-                    <tr key={log._id}>
-                      <td style={{ fontWeight: 600 }}>{log.userId?.fullName || '—'}</td>
-                      <td style={{ fontSize: 13 }}>{log.userId?.institutionName || '—'}</td>
-                      <td><span className={`message-badge badge-${log.type}`}>{log.type}</span></td>
-                      <td style={{ fontSize: 13 }}>{log.phone}</td>
+                  {activities.map(act => (
+                    <tr key={act._id}>
+                      <td style={{ fontWeight: 600 }}>{act.title}</td>
+                      <td><span className={`badge badge-${act.type}`}>{act.type}</span></td>
                       <td>
-                        <span style={{
-                          padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600,
-                          background: log.status === 'sent' ? 'rgba(40,167,69,0.12)' : 'rgba(220,53,69,0.12)',
-                          color: log.status === 'sent' ? 'var(--success)' : 'var(--danger)'
-                        }}>
-                          {log.status === 'sent' ? '✓ Sent' : '✗ Failed'}
+                        <span className={`badge ${
+                          act.status === 'sent' ? 'badge-success' : 
+                          act.status === 'pending' ? 'badge-warning' : 'badge-danger'
+                        }`}>
+                          {act.status}
                         </span>
-                        {log.errorMessage && (
-                          <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 2 }}>
-                            {log.errorMessage.slice(0, 40)}...
-                          </div>
-                        )}
                       </td>
-                      <td style={{ fontSize: 12, color: 'var(--gray)' }}>
-                        {new Date(log.createdAt).toLocaleString('en-IN')}
-                      </td>
+                      <td>{act.recipientCount}</td>
+                      <td>{act.successCount}/{act.failedCount}</td>
+                      <td style={{ fontSize: 12 }}>{act.sentAt ? formatDate(act.sentAt) : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {logs.length === 0 && (
-                <div style={{ textAlign: 'center', padding: '30px', color: 'var(--gray)' }}>
-                  No message logs yet
-                </div>
-              )}
             </div>
           </div>
         )}
