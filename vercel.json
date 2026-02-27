@@ -7,7 +7,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://scheduleeventbackend.onrender.com/api/:path*"
+      "destination": "https://scheduleeventbackend.onrender.com*"
     },
     {
       "source": "/(.*)",

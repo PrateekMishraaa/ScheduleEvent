@@ -60,7 +60,9 @@ export const AuthProvider = ({ children }) => {
 
 const register = async (formData) => {
   // ✅ Backend expects these fields
-  const response = await axiosInstance.post('/auth/register', {
+  const response = await
+   axios.post('https://scheduleeventbackend.onrender.com/api/auth/register', 
+    {
     fullName: formData.fullName,
     email: formData.email,
     password: formData.password,
@@ -83,7 +85,8 @@ const register = async (formData) => {
   // ✅ Login with proper error handling
   const login = async (email, password) => {
     try {
-      const response = await axiosInstance.post('/auth/login', { email, password });
+      const response = await
+       axios.post('https://scheduleeventbackend.onrender.com/auth/login', { email, password });
       const { token: newToken, user: newUser } = response.data;
       
       localStorage.setItem('token', newToken);
@@ -107,7 +110,8 @@ const register = async (formData) => {
   // ✅ Update Profile
   const updateProfile = async (data) => {
     try {
-      const response = await axiosInstance.put('/auth/update-profile', data);
+      const response = await
+       axios.put('https://scheduleeventbackend.onrender.com/auth/update-profile', data);
       setUser(response.data.user);
       return response.data;
     } catch (error) {
@@ -119,7 +123,8 @@ const register = async (formData) => {
   // ✅ Get user messages
   const getMyMessages = async () => {
     try {
-      const response = await axiosInstance.get('/activity/my-messages');
+      const response = await
+       axios.get('https://scheduleeventbackend.onrender.com/activity/my-messages');
       return response.data;
     } catch (error) {
       console.error('Get messages error:', error.response?.data || error.message);
@@ -130,7 +135,8 @@ const register = async (formData) => {
   // ✅ Get user stats
   const getMyStats = async () => {
     try {
-      const response = await axiosInstance.get('/activity/stats');
+      const response = await 
+      axios.get('https://scheduleeventbackend.onrender.com/activity/stats');
       return response.data;
     } catch (error) {
       console.error('Get stats error:', error.response?.data || error.message);
@@ -141,7 +147,8 @@ const register = async (formData) => {
   // ✅ Validate join code with uppercase
   const validateJoinCode = async (code) => {
     try {
-      const response = await axiosInstance.get(`/institutions/join-code/${code.toUpperCase()}`);
+      const response = await 
+      axios.get(`https://scheduleeventbackend.onrender.com/institutions/join-code/${code.toUpperCase()}`);
       return response.data;
     } catch (error) {
       console.error('Validate join code error:', error.response?.data || error.message);
@@ -152,7 +159,8 @@ const register = async (formData) => {
   // ✅ Refresh user data
   const refreshUser = async () => {
     try {
-      const response = await axiosInstance.get('/auth/me');
+      const response = await
+       axios.get('https://scheduleeventbackend.onrender.com/auth/me');
       setUser(response.data.user);
       return response.data;
     } catch (error) {
