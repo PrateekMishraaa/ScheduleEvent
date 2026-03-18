@@ -430,7 +430,7 @@ const Register = () => {
           </div>
 
           {/* Preview - Show entered info */}
-          {formData.phone && (
+          {/* {formData.phone && (
             <div style={{
               marginBottom: '20px',
               padding: '15px',
@@ -451,7 +451,7 @@ const Register = () => {
                 <strong>WhatsApp:</strong> {formData.phone}
               </p>
             </div>
-          )}
+          )} */}
 
           {/* Sandbox Instructions
           <div style={{

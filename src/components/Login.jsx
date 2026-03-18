@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import axios from "axios"
 import { useAuth } from '../context/AuthContext'; // Import useAuth
 
 const Login = () => {
@@ -32,6 +33,13 @@ console.log('form data',formData)
     
     try {
       // Use the context login function instead of axios directly
+      const response = await axios.post('https://scheduleeventbackend.onrender.com/api/auth/login',formData,{
+        headers:{
+          "Content-Type":"application/json"
+        }
+      })
+      console.log('this is login form data',response.data)
+      localStorage.setItem('token',response.data.token)
       await login(formData.email, formData.password);
       
       toast.success('Login successful!');
