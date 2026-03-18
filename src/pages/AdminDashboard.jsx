@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
-
+import axios from "axios"
 const AdminDashboard = () => {
+  const [usersList,setUserList] = useState([])
   const { user, logout, axiosInstance } = useAuth();
   const [stats, setStats] = useState(null);
   const [students, setStudents] = useState([]);
@@ -16,6 +17,19 @@ const AdminDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [loadingLogs, setLoadingLogs] = useState(false);
+
+
+useEffect(()=>{
+  const fetchUser=async()=>{
+    try{
+
+    }catch(error){
+      console.log('error')
+    }
+  }
+  fetchUser()
+},[])
+
 
   useEffect(() => {
     fetchStats();

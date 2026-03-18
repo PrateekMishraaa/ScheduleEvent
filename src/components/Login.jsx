@@ -1,72 +1,204 @@
+// 📁 src/pages/Login.jsx (FIXED)
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext'; // Import useAuth
 
 const Login = () => {
-  const { login } = useAuth();
   const navigate = useNavigate();
+  const { login } = useAuth(); // Get login function from context
   const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    email: "",
+    password: ""
+  });
+console.log('form data',formData)
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
 
-  const { register, handleSubmit, formState: { errors } } = useForm();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Simple validation
+    if (!formData.email || !formData.password) {
+      return toast.error('Please fill in all fields');
+    }
 
-  const onSubmit = async ({ email, password }) => {
     setLoading(true);
+    
     try {
-      const data = await login(email, password);
-      toast.success(`Welcome back, ${data.user.fullName}! 👋`);
-      navigate(data.user.role === 'admin' ? '/admin' : '/dashboard');
+      // Use the context login function instead of axios directly
+      await login(formData.email, formData.password);
+      
+      toast.success('Login successful!');
+      
+      // Note: Don't navigate here - let the PublicRoute component handle redirection
+      // The PublicRoute will automatically redirect based on user role
+      
     } catch (error) {
-      const msg = error.response?.data?.message || 'Login failed. Check your credentials.';
-      toast.error(msg);
+      console.error('Login error:', error);
+      toast.error(error.response?.data?.message || 'Login failed');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="auth-wrapper">
-      <div className="auth-card">
-        <div className="auth-logo">
-          <span className="logo-icon">🎓</span>
-          <h1>Welcome Back!</h1>
-          <p>Login to your Student Activity Platform account</p>
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      padding: '20px'
+    }}>
+      <div style={{
+        background: 'white',
+        padding: '40px',
+        borderRadius: '20px',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+        width: '100%',
+        maxWidth: '400px'
+      }}>
+        
+        {/* Header */}
+        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+          <span style={{ fontSize: '48px' }}>🎓</span>
+          <h1 style={{ color: '#2d3748', fontSize: '24px', margin: '10px 0 5px' }}>
+            Welcome Back!
+          </h1>
+          <p style={{ color: '#718096', fontSize: '14px' }}>
+            Login to your account
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <div className="form-group">
-            <label>Email Address</label>
+        <form onSubmit={handleSubmit}>
+          
+          {/* Email */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ 
+              display: 'block', 
+              marginBottom: '8px', 
+              color: '#4a5568',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}>
+              Email
+            </label>
             <input
-              {...register('email', {
-                required: 'Email is required',
-                pattern: { value: /^\S+@\S+\.\S+$/, message: 'Enter a valid email' }
-              })}
+              name="email"
               type="email"
-              placeholder="rahul@example.com"
-              className={errors.email ? 'error' : ''}
+              value={formData.email}
+              onChange={handleChange}
+              placeholder="Enter your email"
+              disabled={loading}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '2px solid #e2e8f0',
+                borderRadius: '10px',
+                fontSize: '14px',
+                outline: 'none',
+                transition: 'border-color 0.3s',
+                ...(loading && { opacity: 0.7 })
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#667eea'}
+              onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
             />
-            {errors.email && <p className="error-msg">{errors.email.message}</p>}
           </div>
 
-          <div className="form-group">
-            <label>Password</label>
+          {/* Password */}
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{ 
+              display: 'block', 
+              marginBottom: '8px', 
+              color: '#4a5568',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}>
+              Password
+            </label>
             <input
-              {...register('password', { required: 'Password is required' })}
+              name="password"
               type="password"
+              value={formData.password}
+              onChange={handleChange}
               placeholder="Enter your password"
-              className={errors.password ? 'error' : ''}
+              disabled={loading}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '2px solid #e2e8f0',
+                borderRadius: '10px',
+                fontSize: '14px',
+                outline: 'none',
+                transition: 'border-color 0.3s',
+                ...(loading && { opacity: 0.7 })
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#667eea'}
+              onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
             />
-            {errors.password && <p className="error-msg">{errors.password.message}</p>}
           </div>
 
-          <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? '⏳ Logging in...' : '🔐 Login'}
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: '14px',
+              background: loading ? '#a0aec0' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '10px',
+              fontSize: '16px',
+              fontWeight: '600',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              marginBottom: '20px',
+              transition: 'transform 0.3s, opacity 0.3s',
+              ...(!loading && {
+                transform: 'scale(1)',
+                ':hover': {
+                  transform: 'scale(1.02)',
+                  opacity: 0.9
+                }
+              })
+            }}
+            onMouseEnter={(e) => !loading && (e.target.style.transform = 'scale(1.02)')}
+            onMouseLeave={(e) => !loading && (e.target.style.transform = 'scale(1)')}
+          >
+            {loading ? 'Logging in...' : 'Login'}
           </button>
+
+          {/* Demo Credentials */}
+     
+
         </form>
 
-        <div className="auth-link">
-          Don't have an account? <Link to="/register">Register here</Link>
+        {/* Register Link */}
+        <div style={{ 
+          textAlign: 'center', 
+          marginTop: '20px', 
+          fontSize: '14px' 
+        }}>
+          Don't have an account?{' '}
+          <Link 
+            to="/register" 
+            style={{ 
+              color: '#667eea', 
+              textDecoration: 'none',
+              fontWeight: '600',
+              transition: 'color 0.3s'
+            }}
+            onMouseEnter={(e) => e.target.style.color = '#764ba2'}
+            onMouseLeave={(e) => e.target.style.color = '#667eea'}
+          >
+            Register
+          </Link>
         </div>
 
       </div>

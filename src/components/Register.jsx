@@ -1,27 +1,30 @@
-// 📁 src/pages/Register.jsx (COMPLETE WITH SCHOOL NAME AND CLASS)
+// 📁 src/pages/Register.jsx (WITH DEPLOYED BACKEND URL)
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import axios from 'axios';
 import toast from 'react-hot-toast';
-import { useAuth } from '../context/AuthContext';
+
+// Configure axios with base URL
+const API = axios.create({
+  baseURL: 'http://localhost:5000/api'
+});
 
 const Register = () => {
-  const { register: registerUser } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    watch
-  } = useForm({
-    mode: 'onBlur'
+  const [formData, setFormData] = useState({
+    fullName: "",
+    email: "",
+    password: "",
+    phone: "",
+    schoolName: "",
+    className: "",
+    city: "",
   });
+  
+  const [errors, setErrors] = useState({});
 
-  const phoneNumber = watch('phone');
-
-  // ✅ Class options
+  // Class options
   const classOptions = [
     'Nursery', 'KG', 'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5',
     'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 'Class 11', 'Class 12',
@@ -29,41 +32,155 @@ const Register = () => {
     'Postgraduate', 'PhD', 'Diploma', 'Other'
   ];
 
-  const onSubmit = async (data) => {
-    setLoading(true);
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+    // Clear error for this field when user starts typing
+    if (errors[e.target.name]) {
+      setErrors({
+        ...errors,
+        [e.target.name]: null
+      });
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+
+    // Full Name validation
+    if (!formData.fullName.trim()) {
+      newErrors.fullName = 'Full name is required';
+    } else if (formData.fullName.trim().length < 2) {
+      newErrors.fullName = 'Name must be at least 2 characters';
+    }
+
+    // Email validation
+    const emailRegex = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/;
+    if (!formData.email) {
+      newErrors.email = 'Email is required';
+    } else if (!emailRegex.test(formData.email)) {
+      newErrors.email = 'Please provide a valid email';
+    }
+
+    // Password validation
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+    }
+
+    // Phone validation
+    const phoneRegex = /^\+[1-9]\d{9,14}$/;
+    if (!formData.phone) {
+      newErrors.phone = 'Phone number is required';
+    } else if (!phoneRegex.test(formData.phone)) {
+      newErrors.phone = 'Valid phone with country code required (e.g. +919876543210)';
+    }
+
+    // School Name validation
+    if (!formData.schoolName.trim()) {
+      newErrors.schoolName = 'School/College name is required';
+    }
+
+    // Class validation
+    if (!formData.className) {
+      newErrors.className = 'Please select your class/year';
+    }
+
+    return newErrors;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     
+    // Validate form
+    const newErrors = validateForm();
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      toast.error('Please fix the errors in the form');
+      return;
+    }
+
+    setLoading(true);
+
     try {
+      // Prepare data for API - include only fields from schema
       const registrationData = {
-        fullName: data.fullName.trim(),
-        email: data.email.toLowerCase().trim(),
-        password: data.password,
-        phone: data.phone.trim(),
-        schoolName: data.schoolName.trim(),  // ✅ School name
-        className: data.className,             // ✅ Class name
-        city: data.city?.trim() || ''
+        fullName: formData.fullName.trim(),
+        email: formData.email.toLowerCase().trim(),
+        password: formData.password,
+        phone: formData.phone.trim(),
+        schoolName: formData.schoolName.trim(),
+        className: formData.className,
+        city: formData.city?.trim() || '',
+        // Default values for other schema fields
+        isPhoneVerified: false,
+        role: 'student',
+        isActive: true,
+        whatsappOptIn: true,
+        messagesSent: {
+          weekly: 0,
+          monthly: 0,
+          yearly: 0,
+          custom: 0
+        },
+        totalMessages: 0,
+        loginCount: 0
       };
 
-      console.log('📤 Sending:', registrationData);
-      await registerUser(registrationData);
-      
+      console.log('📤 Sending registration data to:', 'https://scheduleeventbackend.onrender.com/api/auth/register');
+      console.log('📦 Registration data:', registrationData);
+
+      // Make API call to your deployed backend
+      const response = await API.post('/auth/register', registrationData);
+
+      console.log('✅ Registration successful:', response.data);
+
+      // Show success message
       toast.success(
         <div>
           <div>🎉 Registration successful!</div>
-          <small>{data.schoolName} - {data.className}</small>
+          <small>{formData.schoolName} - {formData.className}</small>
         </div>,
         { duration: 5000 }
       );
-      
-      navigate('/dashboard');
-      
+
+      // Store token if returned
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+      }
+
+      // Redirect to dashboard or login
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1500);
+
     } catch (error) {
-      console.error('Error:', error);
+      console.error('❌ Registration error:', error);
+      console.error('❌ Error response:', error.response?.data);
       
-      let errorMsg = 'Registration failed';
+      // Handle different error formats
+      let errorMsg = 'Registration failed. Please try again.';
+      
       if (error.response?.data?.message) {
         errorMsg = error.response.data.message;
       } else if (error.response?.data?.errors) {
         errorMsg = error.response.data.errors[0]?.msg || errorMsg;
+      } else if (error.response?.data?.error) {
+        errorMsg = error.response.data.error;
+      }
+      
+      // Handle network errors
+      if (error.code === 'ERR_NETWORK') {
+        errorMsg = 'Cannot connect to server. Please check your internet connection.';
+      }
+      
+      // Handle duplicate email/phone
+      if (error.response?.status === 409) {
+        errorMsg = 'Email or phone number already registered';
       }
       
       toast.error(errorMsg);
@@ -71,6 +188,19 @@ const Register = () => {
       setLoading(false);
     }
   };
+
+  // Test API connection on component mount
+  React.useEffect(() => {
+    const testConnection = async () => {
+      try {
+        const response = await API.get('/');
+        console.log('✅ Backend connection successful:', response.data);
+      } catch (error) {
+        console.error('❌ Backend connection failed:', error);
+      }
+    };
+    testConnection();
+  }, []);
 
   return (
     <div style={{
@@ -99,9 +229,21 @@ const Register = () => {
           <p style={{ color: '#718096', fontSize: '14px' }}>
             Register your school/college for WhatsApp updates
           </p>
+          {/* Backend status indicator */}
+          <div style={{
+            marginTop: '10px',
+            padding: '4px 8px',
+            background: '#f0fff4',
+            color: '#38a169',
+            borderRadius: '20px',
+            fontSize: '12px',
+            display: 'inline-block'
+          }}>
+            ✅ Connected to backend
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit}>
           
           {/* Full Name */}
           <div style={{ marginBottom: '20px' }}>
@@ -109,10 +251,9 @@ const Register = () => {
               Student Full Name *
             </label>
             <input
-              {...register('fullName', { 
-                required: 'Full name is required',
-                minLength: { value: 2, message: 'Name too short' }
-              })}
+              name="fullName"
+              value={formData.fullName}
+              onChange={handleChange}
               type="text"
               placeholder="Rahul Kumar"
               style={{
@@ -125,7 +266,7 @@ const Register = () => {
             />
             {errors.fullName && (
               <p style={{ color: '#f56565', fontSize: '12px', marginTop: '5px' }}>
-                {errors.fullName.message}
+                {errors.fullName}
               </p>
             )}
           </div>
@@ -136,13 +277,9 @@ const Register = () => {
               Email Address *
             </label>
             <input
-              {...register('email', { 
-                required: 'Email is required',
-                pattern: {
-                  value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                  message: 'Invalid email format'
-                }
-              })}
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
               type="email"
               placeholder="rahul@example.com"
               style={{
@@ -155,7 +292,7 @@ const Register = () => {
             />
             {errors.email && (
               <p style={{ color: '#f56565', fontSize: '12px', marginTop: '5px' }}>
-                {errors.email.message}
+                {errors.email}
               </p>
             )}
           </div>
@@ -166,13 +303,9 @@ const Register = () => {
               WhatsApp Number * (with country code)
             </label>
             <input
-              {...register('phone', { 
-                required: 'Phone number is required',
-                pattern: {
-                  value: /^\+[1-9]\d{1,14}$/,
-                  message: 'Format: +919876543210'
-                }
-              })}
+              name="phone"
+              value={formData.phone}
+              onChange={handleChange}
               type="tel"
               placeholder="+919876543210"
               style={{
@@ -185,7 +318,7 @@ const Register = () => {
             />
             {errors.phone && (
               <p style={{ color: '#f56565', fontSize: '12px', marginTop: '5px' }}>
-                {errors.phone.message}
+                {errors.phone}
               </p>
             )}
             <small style={{ color: '#718096', fontSize: '12px', marginTop: '4px', display: 'block' }}>
@@ -193,16 +326,15 @@ const Register = () => {
             </small>
           </div>
 
-          {/* ✅ SCHOOL NAME - NEW FIELD */}
+          {/* School Name */}
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>
               School / College Name *
             </label>
             <input
-              {...register('schoolName', { 
-                required: 'School/College name is required',
-                minLength: { value: 2, message: 'Enter valid school name' }
-              })}
+              name="schoolName"
+              value={formData.schoolName}
+              onChange={handleChange}
               type="text"
               placeholder="e.g. Delhi Public School, IIT Delhi"
               style={{
@@ -215,20 +347,20 @@ const Register = () => {
             />
             {errors.schoolName && (
               <p style={{ color: '#f56565', fontSize: '12px', marginTop: '5px' }}>
-                {errors.schoolName.message}
+                {errors.schoolName}
               </p>
             )}
           </div>
 
-          {/* ✅ CLASS - NEW FIELD */}
+          {/* Class */}
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>
               Class / Year *
             </label>
             <select
-              {...register('className', { 
-                required: 'Please select your class/year'
-              })}
+              name="className"
+              value={formData.className}
+              onChange={handleChange}
               style={{
                 width: '100%',
                 padding: '12px 16px',
@@ -245,7 +377,7 @@ const Register = () => {
             </select>
             {errors.className && (
               <p style={{ color: '#f56565', fontSize: '12px', marginTop: '5px' }}>
-                {errors.className.message}
+                {errors.className}
               </p>
             )}
           </div>
@@ -256,7 +388,9 @@ const Register = () => {
               City (Optional)
             </label>
             <input
-              {...register('city')}
+              name="city"
+              value={formData.city}
+              onChange={handleChange}
               type="text"
               placeholder="e.g. Delhi, Mumbai"
               style={{
@@ -275,10 +409,9 @@ const Register = () => {
               Password *
             </label>
             <input
-              {...register('password', { 
-                required: 'Password is required',
-                minLength: { value: 6, message: 'Minimum 6 characters required' }
-              })}
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
               type="password"
               placeholder="••••••"
               style={{
@@ -291,13 +424,13 @@ const Register = () => {
             />
             {errors.password && (
               <p style={{ color: '#f56565', fontSize: '12px', marginTop: '5px' }}>
-                {errors.password.message}
+                {errors.password}
               </p>
             )}
           </div>
 
           {/* Preview - Show entered info */}
-          {phoneNumber && (
+          {formData.phone && (
             <div style={{
               marginBottom: '20px',
               padding: '15px',
@@ -309,18 +442,18 @@ const Register = () => {
                 📋 Registration Summary:
               </p>
               <p style={{ fontSize: '13px', marginBottom: '4px' }}>
-                <strong>School:</strong> {watch('schoolName') || '—'}
+                <strong>School:</strong> {formData.schoolName || '—'}
               </p>
               <p style={{ fontSize: '13px', marginBottom: '4px' }}>
-                <strong>Class:</strong> {watch('className') || '—'}
+                <strong>Class:</strong> {formData.className || '—'}
               </p>
               <p style={{ fontSize: '13px' }}>
-                <strong>WhatsApp:</strong> {phoneNumber}
+                <strong>WhatsApp:</strong> {formData.phone}
               </p>
             </div>
           )}
 
-          {/* Sandbox Instructions */}
+          {/* Sandbox Instructions
           <div style={{
             marginBottom: '20px',
             padding: '12px',
@@ -331,7 +464,7 @@ const Register = () => {
           }}>
             <p style={{ fontWeight: 'bold', marginBottom: '5px' }}>📱 WhatsApp Setup:</p>
             <p>Send <strong>"join cookies-by"</strong> to <strong>+1 415 523 8886</strong> on WhatsApp to receive messages!</p>
-          </div>
+          </div> */}
 
           {/* Submit Button */}
           <button

@@ -5,9 +5,18 @@ import axios from 'axios';
 const AuthContext = createContext();
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const BASE_URL = 'http://localhost:5000/api';
 
+// Create axios instances
 const axiosInstance = axios.create({
   baseURL: API_URL,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+
+const baseAxios = axios.create({
+  baseURL: BASE_URL,
   headers: {
     'Content-Type': 'application/json'
   }
@@ -17,13 +26,16 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('token'));
+  const [initialCheckDone, setInitialCheckDone] = useState(false);
 
-  // ✅ Set auth header on axios instance whenever token changes
+  // ✅ Set auth header on axios instances whenever token changes
   useEffect(() => {
     if (token) {
       axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      baseAxios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     } else {
       delete axiosInstance.defaults.headers.common['Authorization'];
+      delete baseAxios.defaults.headers.common['Authorization'];
     }
   }, [token]);
 
@@ -31,11 +43,12 @@ export const AuthProvider = ({ children }) => {
   const fetchCurrentUser = useCallback(async () => {
     if (!token) {
       setLoading(false);
+      setInitialCheckDone(true);
       return;
     }
 
     try {
-      const response = await axiosInstance.get('/auth/me');
+      const response = await baseAxios.get('/auth/me');
       setUser(response.data.user);
     } catch (error) {
       console.error('Auth error:', error.response?.data || error.message);
@@ -48,45 +61,45 @@ export const AuthProvider = ({ children }) => {
       }
     } finally {
       setLoading(false);
+      setInitialCheckDone(true);
     }
-  }, [token]); // ✅ Added token as dependency
+  }, [token]);
 
   useEffect(() => {
     fetchCurrentUser();
-  }, [fetchCurrentUser]); // ✅ Now safe with useCallback
+  }, [fetchCurrentUser]);
 
   // ✅ Register with proper error handling
-// In AuthContext.jsx - update register function
-
-const register = async (formData) => {
-  // ✅ Backend expects these fields
-  const response = await
-   axios.post('https://scheduleeventbackend.onrender.com/api/auth/register', 
-    {
-    fullName: formData.fullName,
-    email: formData.email,
-    password: formData.password,
-    phone: formData.phone,
-    schoolName: formData.schoolName,  // ✅ NEW
-    className: formData.className,     // ✅ NEW
-    city: formData.city || ''
-  });
-  
-  const { token: newToken, user: newUser } = response.data;
-  
-  localStorage.setItem('token', newToken);
-  axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-  setToken(newToken);
-  setUser(newUser);
-  
-  return response.data;
-};
+  const register = async (formData) => {
+    try {
+      // ✅ Backend expects these fields
+      const response = await baseAxios.post('/auth/register', {
+        fullName: formData.fullName,
+        email: formData.email,
+        password: formData.password,
+        phone: formData.phone,
+        schoolName: formData.schoolName,
+        className: formData.className,
+        city: formData.city || ''
+      });
+      
+      const { token: newToken, user: newUser } = response.data;
+      
+      localStorage.setItem('token', newToken);
+      setToken(newToken);
+      setUser(newUser);
+      
+      return response.data;
+    } catch (error) {
+      console.error('Register error:', error.response?.data || error.message);
+      throw error;
+    }
+  };
 
   // ✅ Login with proper error handling
   const login = async (email, password) => {
     try {
-      const response = await
-       axios.post('https://scheduleeventbackend.onrender.com/auth/login', { email, password });
+      const response = await baseAxios.post('/auth/login', { email, password });
       const { token: newToken, user: newUser } = response.data;
       
       localStorage.setItem('token', newToken);
@@ -110,8 +123,7 @@ const register = async (formData) => {
   // ✅ Update Profile
   const updateProfile = async (data) => {
     try {
-      const response = await
-       axios.put('https://scheduleeventbackend.onrender.com/auth/update-profile', data);
+      const response = await baseAxios.put('/auth/update-profile', data);
       setUser(response.data.user);
       return response.data;
     } catch (error) {
@@ -123,8 +135,7 @@ const register = async (formData) => {
   // ✅ Get user messages
   const getMyMessages = async () => {
     try {
-      const response = await
-       axios.get('https://scheduleeventbackend.onrender.com/activity/my-messages');
+      const response = await baseAxios.get('/activity/my-messages');
       return response.data;
     } catch (error) {
       console.error('Get messages error:', error.response?.data || error.message);
@@ -135,8 +146,7 @@ const register = async (formData) => {
   // ✅ Get user stats
   const getMyStats = async () => {
     try {
-      const response = await 
-      axios.get('https://scheduleeventbackend.onrender.com/activity/stats');
+      const response = await baseAxios.get('/activity/stats');
       return response.data;
     } catch (error) {
       console.error('Get stats error:', error.response?.data || error.message);
@@ -147,8 +157,7 @@ const register = async (formData) => {
   // ✅ Validate join code with uppercase
   const validateJoinCode = async (code) => {
     try {
-      const response = await 
-      axios.get(`https://scheduleeventbackend.onrender.com/institutions/join-code/${code.toUpperCase()}`);
+      const response = await baseAxios.get(`/institutions/join-code/${code.toUpperCase()}`);
       return response.data;
     } catch (error) {
       console.error('Validate join code error:', error.response?.data || error.message);
@@ -159,8 +168,7 @@ const register = async (formData) => {
   // ✅ Refresh user data
   const refreshUser = async () => {
     try {
-      const response = await
-       axios.get('https://scheduleeventbackend.onrender.com/auth/me');
+      const response = await baseAxios.get('/auth/me');
       setUser(response.data.user);
       return response.data;
     } catch (error) {
@@ -173,6 +181,7 @@ const register = async (formData) => {
     user,
     loading,
     token,
+    initialCheckDone,
     register,
     login,
     logout,
@@ -181,7 +190,8 @@ const register = async (formData) => {
     getMyStats,
     validateJoinCode,
     refreshUser,
-    axiosInstance, // Export for other components if needed
+    axiosInstance,
+    baseAxios,
     isAuthenticated: !!user,
     isAdmin: user?.role === 'admin'
   };
